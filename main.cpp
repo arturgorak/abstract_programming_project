@@ -50,7 +50,7 @@ public:
 class Wombat{
 public:
     std::string name;
-    float health;
+    int health;
     int current_stamina;
     int stamina;
     int current_mana;
@@ -116,7 +116,7 @@ public:
                 << "reduce distance" << std::endl
                 << "increase distance" << std::endl;
     }
-    virtual void choose_move(Wombat& defender){};
+    virtual void choose_move(Wombat& defender, int distance){};
 //    virtual void print_moves() = 0;
 
     bool is_dead(){
@@ -124,31 +124,99 @@ public:
     }
 };
 
-
-class Sword: public Weapon{
+class Attack{
 public:
-    int distances[4] = {2, 5, 8, 11};
+    std::string name;
+    int min_range;
+    int max_range;
+    int scaling_dex;
+    int scaling_strength;
+    int mana_cost;
+    int stamina_cost;
 
-    void long_range_attack(Wombat& attacker, Wombat& defender){
-        float dmg = attacker.strength * 4;
-        attacker.stamina -= 6;
+
+    Attack(
+            std::string name,
+            int min_range,
+            int max_range,
+            int scaling_dex,
+            int scaling_strength,
+            int mana_cost,
+            int stamina_cost) : name(std::move(name)), min_range(min_range), max_range(max_range), scaling_dex(scaling_dex), scaling_strength(scaling_strength), mana_cost(mana_cost), stamina_cost(stamina_cost) {}
+
+    bool check_available(int distance){
+        return distance >= min_range and distance <= max_range;
+    }
+
+    bool check_resources(Wombat& attacker){
+        return mana_cost <= attacker.mana and stamina_cost <= attacker.stamina;
+    }
+
+    void deal_dmg(Wombat& attacker, Wombat& defender){
+        int dmg = attacker.strength * scaling_strength + attacker.dex * scaling_dex;
+        attacker.stamina -= stamina_cost;
+        attacker.mana -= mana_cost;
         defender.health -= dmg;
+    }
+    void print(){
+        std::cout
+        << "Name " << name << std::endl
+        << "Min range " << min_range << std::endl
+        << "Max range " << max_range << std::endl
+        << "Stamina " << stamina_cost << std::endl;
+    }
+
+    void process_attack(Wombat& attacker, Wombat& defender, int distance){
+        print();
+        if(not check_available(distance)){
+            std::cout << "Chybiono: Cel znajduje sie w odleglosci " << distance << ", podczas gdy atak ma zasieg " << min_range << " do " << max_range << std:: endl;
+            return;
+
+        }
+
+        if(not check_resources(attacker)){
+            std::cout << "Nie posiadasz zasobów aby uzyc tego ataku. Wymaga on " << stamina_cost << " punktow staminy i " << mana_cost << " punktow many"<< std:: endl;
+            std::cout << "Niestety tracisz ruch" << std:: endl;
+            return;
+
+        }
+
+        deal_dmg(attacker, defender);
 
     }
-    void mid_range_attack(Wombat& attacker, Wombat& defender){
-        float dmg = attacker.strength * 2 + attacker.dex * 2;
-        attacker.stamina -= 4;
-        defender.health -= dmg;
 
+    std::string get_name(){
+        std::cout << "yo1" << std::endl;
+        return name;
     }
-    void low_range_attack(Wombat& attacker, Wombat& defender){
-        std::cout << "Wywoluje low range attack" << std::endl;
 
-        float dmg = attacker.dex * 4;
-        attacker.stamina -= 2;
-        defender.health -= dmg;
+};
 
+
+class Sword : public Weapon {
+public:
+    std::map<std::string, Attack> attacks{
+            {"Blisko", Attack("Blisko", 0, 4, 4, 0, 0, 3)},
+            {"Srednio", Attack("Srednio", 3, 6, 2, 2, 0, 5)},
+            {"Daleko", Attack("Daleko", 5, 9, 0, 4, 0, 7)},
+    };
+
+
+    void print_attacks_names() {
+        std::cout << "Attack names:" << std::endl;
+        for (const auto& elem : this->attacks) {
+            std::cout << elem.first << std::endl;
+        }
     }
+
+    [[nodiscard]] bool contains(const std::string& key) const {
+        return (attacks.contains(key));
+    }
+
+    void process_move(const std::string& key, Wombat& attacker, Wombat& defender, int distance ){
+        this->attacks.at(key).process_attack(attacker, defender, distance);
+    }
+
 };
 
 
@@ -156,20 +224,20 @@ class Catalyst: public Weapon{
 public:
 
     void long_range_attack(Wombat& attacker, Wombat& defender){
-        float dmg = attacker.strength * 4;
+        int dmg = attacker.strength * 4;
         attacker.stamina -= 6;
         defender.health -= dmg;
 
     }
     void mid_range_attack(Wombat& attacker, Wombat& defender) {
-        float dmg = attacker.strength * 2 + attacker.dex * 2;
+        int dmg = attacker.strength * 2 + attacker.dex * 2;
         attacker.stamina -= 4;
         defender.health -= dmg;
 
     }
     void low_range_attack(Wombat& attacker, Wombat& defender) {
 
-        float dmg = attacker.dex * 4;
+        int dmg = attacker.dex * 4;
         attacker.stamina -= 2;
         defender.health -= dmg;
 
@@ -178,10 +246,10 @@ public:
 
 class WomKnight : public Wombat{
 //    std::map<std::string, int> moves{{"Help", 0}, {"Mage", 1}};
-    Sword& weapon;
+    Sword* weapon;
 
 public:
-    WomKnight(std::string n, Sword& w, Battlefield& b) : Wombat(n, 10, 10, 5,5, 4, 2, b), weapon(w) {}
+    WomKnight(std::string n, Sword* w, Battlefield& b) : Wombat(n, 10, 10, 5,5, 4, 2, b), weapon(w) {}
 
     void print_moves() override{
 //        print_base_moves();
@@ -198,14 +266,12 @@ public:
     }
 
 
-    void choose_move(Wombat& defender){
+    void choose_move(Wombat& defender, int distance){
         std::map<std::string, std::function<void()>> moves{
-                {"wait", [this, &defender]() { wait(); }},
-                {"reduce-distance", [this, &defender]() { reduce_distance(); }},
-                {"increase-distance", [this, &defender]() { increase_distance(); }},
-                {"low-range-attack", [this, &defender]() { this->weapon.low_range_attack(*this, defender); }},
-                {"mid-range-attack", [this, &defender]() { this->weapon.mid_range_attack(*this, defender); }},
-                {"long-range-attack", [this, &defender]() {this->weapon.long_range_attack(*this, defender); }}
+                {"wait", [this]() { wait(); }},
+                {"reduce-distance", [this]() { reduce_distance(); }},
+                {"increase-distance", [this]() { increase_distance(); }},
+
         };
 
 
@@ -214,6 +280,8 @@ public:
         for (const auto& move : moves) {
             std::cout << move.first << std::endl;
         }
+
+        this->weapon->print_attacks_names();
 
         while (true) {
             std::string chosen_move;
@@ -225,6 +293,11 @@ public:
             if (moves.contains(chosen_move)) {
                 moves[chosen_move]();
                 break;
+
+            } else if(weapon->contains(chosen_move)){
+                this->weapon->process_move(chosen_move, *this, defender, distance);
+                break;
+
             } else {
                 std::cout << "Prosze podac ponownie, ruch " << chosen_move << " jest niepoprawny" << std::endl;
             }
@@ -291,7 +364,7 @@ public:
                 switch (classes[chosen_class]) {
                     case 0: {
                         std::cout << "You choose Knight" << std::endl;
-                        Sword sword;
+                        auto sword = new Sword();
                         return new WomKnight(name, sword, *this);
                     }
                     case 1: {
@@ -323,7 +396,7 @@ public:
 
         while(true){
             std::cout << "Tura " << player1->name << std::endl;
-            player1->choose_move(*player2);
+            player1->choose_move(*player2, current_distance);
 
             player2->stats();
             if(player2->is_dead()){
@@ -332,7 +405,7 @@ public:
             }
 
             std::cout << "Tura " << player2->name << std::endl;
-            player2->choose_move(*player1);
+            player2->choose_move(*player1, current_distance);
 
 
             if(player1->is_dead()){
