@@ -8,8 +8,10 @@
 #include <ranges>
 #include <bits/stdc++.h>
 
+template <typename T>
+concept Numeric = std::is_arithmetic<T>::value;
 
-
+template <Numeric T>
 class Battlefield;
 
 class Armour{
@@ -18,21 +20,19 @@ public:
     int physical_def;
 };
 
-class Wombat;
 
-
-
+template <Numeric T>
 class Wombat{
 public:
     std::string name;
-    int health;
-    int current_stamina;
-    int stamina;
-    int current_mana;
-    int mana;
-    int strength;
-    int dex;
-    int luck;
+    T health;
+    T current_stamina;
+    T stamina;
+    T current_mana;
+    T mana;
+    T strength;
+    T dex;
+    T luck;
 
     std::map<std::string, std::function<void()>> moves{
             {"wait", [this]() { wait(); }},
@@ -43,12 +43,12 @@ public:
 
     Armour armour{};
 //    status* statuses{};
-    Battlefield& battlefield;
+    Battlefield<T>& battlefield;
 
-    int stamina_restore = 5;
-    int mana_restore = 5;
+    T stamina_restore = 5;
+    T mana_restore = 5;
 
-    Wombat(std::string n, int h, int s, int m, int str, int d, int l, Battlefield &b) :name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l), battlefield(b) {}
+    Wombat(std::string n, T h, T s, T m, T str, T d, T l, Battlefield<T> &b) :name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l), battlefield(b) {}
 
     void stats() const{
         std::cout
@@ -104,14 +104,15 @@ public:
     }
 };
 
+template <Numeric T>
 class Attack{
 public:
     int min_range;
     int max_range;
-    int scaling_dex;
-    int scaling_strength;
-    int mana_cost;
-    int stamina_cost;
+    T scaling_dex;
+    T scaling_strength;
+    T mana_cost;
+    T stamina_cost;
 
 
     Attack(
@@ -126,18 +127,18 @@ public:
         return distance >= min_range and distance <= max_range;
     }
 
-    bool check_resources(Wombat& attacker){
+    bool check_resources(Wombat<T>& attacker){
         return mana_cost <= attacker.mana and stamina_cost <= attacker.stamina;
     }
 
-    void deal_dmg(Wombat& attacker, Wombat& defender){
-        int dmg = attacker.strength * scaling_strength + attacker.dex * scaling_dex;
+    void deal_dmg(Wombat<T>& attacker, Wombat<T>& defender){
+        T dmg = attacker.strength * scaling_strength + attacker.dex * scaling_dex;
         defender.health -= dmg;
     }
 
-    void process_attack(Wombat& attacker, Wombat& defender, int distance){
+    void process_attack(Wombat<T>& attacker, Wombat<T>& defender, int distance){
         if(not check_resources(attacker)){
-            std::cout << "Nie posiadasz zasobów aby uzyc tego ataku. Wymaga on " << stamina_cost << " punktow staminy i " << mana_cost << " punktow many"<< std:: endl;
+            std::cout << "Nie posiadasz zasobow aby uzyc tego ataku. Wymaga on " << stamina_cost << " punktow staminy i " << mana_cost << " punktow many"<< std:: endl;
             std::cout << "Niestety tracisz ruch" << std:: endl;
             return;
 
@@ -158,10 +159,11 @@ public:
 
 };
 
+template <Numeric T>
 class Weapon{
-    std::map<std::string, Attack>& attacks;
+    std::map<std::string, Attack<T>>& attacks;
 public:
-    Weapon(std::map<std::string, Attack> &attacks) : attacks(attacks) {}
+    explicit Weapon(std::map<std::string, Attack<T>> &attacks) : attacks(attacks) {}
 
     void print_attacks_names() {
         std::cout << std::endl << "Dostepne ataki:" << std::endl;
@@ -174,47 +176,51 @@ public:
         return (attacks.contains(key));
     }
 
-    void process_move(const std::string& key, Wombat& attacker, Wombat& defender, int distance ){
+    void process_move(const std::string& key, Wombat<T>& attacker, Wombat<T>& defender, int distance ){
         this->attacks.at(key).process_attack(attacker, defender, distance);
     }
 
 };
 
-
-class Sword : public Weapon {
+template <Numeric T>
+class Sword : public Weapon<T> {
 public:
-    std::map<std::string, Attack> attacks{
-            {"Blisko", Attack(0, 4, 4, 0, 0, 3)},
-            {"Srednio", Attack(3, 6, 2, 2, 0, 5)},
-            {"Daleko", Attack(5, 9, 0, 4, 0, 7)},
+    std::map<std::string, Attack<T>> attacks{
+            {"Blisko", Attack<T>(0, 4, 4, 0, 0, 3)},
+            {"Srednio", Attack<T>(3, 6, 2, 2, 0, 5)},
+            {"Daleko", Attack<T>(5, 9, 0, 4, 0, 7)},
     };
 
-    Sword() : Weapon(attacks) {}
+    Sword() : Weapon<T>(attacks) {}
 
 };
 
-
-class Bow: public Weapon{
+template <Numeric T>
+class Bow: public Weapon<T>{
 public:
 
-    std::map<std::string, Attack> attacks{
-            {"Slaby", Attack(7, 13, 6, 0, 0, 3)},
-            {"Mocny", Attack( 10, 17, 4, 2, 0, 5)},
-            {"Sniper", Attack(15, 20, 4, 4, 0, 7)},
+    std::map<std::string, Attack<T>> attacks{
+            {"Slaby", Attack<T>(7, 13, 6, 0, 0, 3)},
+            {"Mocny", Attack<T>( 10, 17, 4, 2, 0, 5)},
+            {"Sniper", Attack<T>(15, 20, 4, 4, 0, 7)},
     };
 
-    Bow() : Weapon(attacks) {}
+    Bow() : Weapon<T>(attacks) {}
 
 };
 
-class WomKnight : public Wombat{
-    Sword* weapon;
+template <Numeric T>
+class WomKnight : public Wombat<T>{
+    Sword<T>* weapon;
 
 public:
-    WomKnight(std::string n, Sword* w, Battlefield& b) : Wombat(n, 10, 10, 5,5, 4, 2, b), weapon(w) {}
+    WomKnight(std::string n, Sword<T>* w, Battlefield<T>& b) : Wombat<T>(n, 10, 10, 5,5, 4, 2, b), weapon(w) {}
 
-    void choose_move(Wombat& defender, int distance){
-        print_moves();
+    void reduce_distance();
+
+    void choose_move(Wombat<T>& defender, int distance){
+        std::cout << "status" << std::endl;
+        this->print_moves();
         this->weapon->print_attacks_names();
 
         while (true) {
@@ -224,14 +230,17 @@ public:
 
             std::cout << std::endl << "Wybrano ruch: " << chosen_move << std::endl;
 
-            if (moves.contains(chosen_move)) {
-                moves[chosen_move]();
-                reduce_distance();
+            if(chosen_move == "status"){ //TODO repair
+                this->stats();
+                std::cout << "Prosze podac ponownie ruch"  << std::endl;
+            } else if (this->moves.contains(chosen_move)) {
+                this->moves[chosen_move]();
+                this->reduce_distance();
                 break;
 
             } else if(weapon->contains(chosen_move)){
                 this->weapon->process_move(chosen_move, *this, defender, distance);
-                reduce_distance();
+                this->reduce_distance();
                 break;
 
             } else {
@@ -240,15 +249,20 @@ public:
         }
 
     }
+
+
 };
 
-class WoArcher : public Wombat{
+template <Numeric T>
+class WoArcher : public Wombat<T>{
 public:
-    Bow* weapon;
-    WoArcher(std::string n, Bow* w, Battlefield& b) : Wombat(n, 7, 7, 10,2, 6, 3, b), weapon(w) {}
+    Bow<T>* weapon;
+    WoArcher(std::string n, Bow<T>* w, Battlefield<T>& b) : Wombat<T>(n, 7, 7, 10,2, 6, 3, b), weapon(w) {}
 
-    void choose_move(Wombat& defender, int distance){
-        print_moves();
+    void increase_distance();
+
+    void choose_move(Wombat<T>& defender, int distance){
+        this->print_moves();
         this->weapon->print_attacks_names();
 
         while (true) {
@@ -258,14 +272,14 @@ public:
 
             std::cout << std::endl << "Wybrano ruch: " << chosen_move << std::endl;
 
-            if (moves.contains(chosen_move)) {
-                moves[chosen_move]();
-                increase_distance();
+            if (this->moves.contains(chosen_move)) {
+                this->moves[chosen_move]();
+                this->increase_distance();
                 break;
 
             } else if(weapon->contains(chosen_move)){
                 this->weapon->process_move(chosen_move, *this, defender, distance);
-                increase_distance();
+                this->increase_distance();
                 break;
 
             } else {
@@ -275,9 +289,10 @@ public:
 
     }
 
+
 };
 
-
+template <Numeric T>
 class Battlefield{
 
     int current_distance = 10;
@@ -295,7 +310,7 @@ public:
     void increase_distance(int distance){
         current_distance = std::min(max_distance, current_distance + distance);
     }
-    Wombat* create_wombat(const std::string& name){
+    Wombat<T>* create_wombat(const std::string& name){
         auto kv = std::views::keys(classes);
 
         while(true) {
@@ -312,12 +327,12 @@ public:
                 switch (classes[chosen_class]) {
                     case 0: {
                         std::cout << "You choose Knight" << std::endl;
-                        auto sword = new Sword();
+                        auto sword = new Sword<T>();
                         return new WomKnight(name, sword, *this);
                     }
                     case 1: {
                         std::cout << "You choose Archer" << std::endl;
-                        auto bow = new Bow();
+                        auto bow = new Bow<T>();
                         return new WoArcher(name, bow, *this);
                     }
 
@@ -333,26 +348,28 @@ public:
 
     void game(){
         std::cout << "-------PLAYER 1------" << std::endl;
-        Wombat* player1 = create_wombat("Player 1");
+        Wombat<T>* player1 = create_wombat("Player 1");
 
 
         std::cout << "-------PLAYER 2------" << std::endl;
 
-        Wombat* player2 = create_wombat("Player 2");
+        Wombat<T>* player2 = create_wombat("Player 2");
 
         std::cout << "-------FIGHT------" << std::endl;
 
         while(true){
             std::cout << "Tura " << player1->name << std::endl;
+            std::cout << "Obecny dystacs wynosi: " << current_distance << std::endl;
+
             player1->choose_move(*player2, current_distance);
 
-            player2->stats();
             if(player2->is_dead()){
                 std::cout << "Wygral gracz: " << player1->name << std::endl;
                 break;
             }
 
             std::cout << "Tura " << player2->name << std::endl;
+            std::cout << "Obecny dystacs wynosi: " << current_distance << std::endl;
             player2->choose_move(*player1, current_distance);
 
 
@@ -366,18 +383,28 @@ public:
     }
 };
 
-inline void Wombat::reduce_distance() {
-    std::cout << "Wywoluje reduce" << std::endl;
-
+template <Numeric T>
+inline void Wombat<T>::reduce_distance() {
     battlefield.reduce_distance(dex);
 }
-inline void Wombat::increase_distance() {
-    std::cout << "Wywoluje increase" << std::endl;
 
+template <Numeric T>
+inline void Wombat<T>::increase_distance() {
     battlefield.increase_distance(dex);
 }
 
+
+template <Numeric T>
+inline void WomKnight<T>::reduce_distance() {
+    this->battlefield.reduce_distance(this->dex * 2);
+}
+
+template <Numeric T>
+inline void WoArcher<T>::increase_distance() {
+    this->battlefield.increase_distance(this->dex * 2);
+}
+
 int main() {
-    Battlefield battlefield;
+    Battlefield<int> battlefield;
     battlefield.game();
 }
