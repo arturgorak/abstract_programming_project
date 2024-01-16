@@ -23,30 +23,69 @@ template <Numeric T>
 class Weapon;
 
 template <Numeric T>
-class Armour{
+class Armor{
 public:
     T magical_def;
     T physical_def;
 
-    Armour(T md, T pd): magical_def(md), physical_def(pd) {}
+    Armor(T md, T pd): magical_def(md), physical_def(pd) {}
 
     virtual void effect(Wombat<T>& defender){};
 };
 
 template <Numeric T>
-class LightArmour : public Armour<T>{
+class LightArmor : public Armor<T>{
 public:
-    LightArmour(): Armour<T>(2, 2){}
+    LightArmor(T md, T pd): Armor<T>(md, pd){}
+};
+
+template <Numeric T>
+class ThiefArmor : public LightArmor<T>{
+public:
+    ThiefArmor(): LightArmor<T>(2, 4){}
+    void effect(Wombat<T>& wombat);
+};
+
+
+template <Numeric T>
+class HunterArmor : public LightArmor<T>{
+public:
+    HunterArmor(): LightArmor<T>(3, 3){}
     void effect(Wombat<T>& wombat);
 };
 
 template <Numeric T>
-class HeavyArmour: public Armour<T>{
+class HeavyArmor: public Armor<T>{
 public:
-    HeavyArmour(): Armour<T>(5, 5){}
+    HeavyArmor(T md, T pd): Armor<T>(md, pd){}
+
+};
+
+
+template <Numeric T>
+class HavelArmor: public HeavyArmor<T>{
+public:
+    HavelArmor(): HeavyArmor<T>(7, 7){}
     void effect(Wombat<T>& wombat);
 
 };
+
+template <Numeric T>
+class EliteKnightArmor: public HeavyArmor<T>{
+public:
+    EliteKnightArmor(): HeavyArmor<T>(5, 5){}
+    void effect(Wombat<T>& wombat);
+
+};
+
+//template <Numeric U>
+//template <typename T>
+//concept WeaponArmor = std::is_same_v<T, Armor<U>*> || std::is_same_v<T, Weapon<U>*>;
+//
+
+template <typename T, typename U>
+concept WeaponArmor = (std::is_same_v<T, Armor<U>*> || std::is_same_v<T, Weapon<U>*>) && std::is_arithmetic<U>::value;
+
 
 
 template <Numeric T>
@@ -63,21 +102,27 @@ public:
     T luck;
 
     std::map<std::string, std::function<void()>> moves{
-            {"czekaj", [this]() { this->wait(); }},
+            {"czekaj", [this]() { wait(); }},
             {"zmniejsz dystans", [this]() { this->reduce_distance(); }},
             {"zwieksz dystans", [this]() { this->increase_distance(); }},
 
     };
 
+    std::map<std::string, std::function<void()>> info_moves{
+            {"statystyki", [this]() { stats(); }},
+            {"ataki", [this]() { this->weapon->print_attacks_stats(); }},
+
+    };
+
 //    status* statuses{};
     Battlefield<T>& battlefield;
-    Armour<T>* armour;
+    Armor<T>* armor;
     Weapon<T>* weapon;
 
     T stamina_restore = 5;
     T mana_restore = 5;
 
-    Wombat(std::string n, T h, T s, T m, T str, T d, T l,Weapon<T>* w, Armour<T>* a, Battlefield<T> &b) :name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l), weapon(w), armour(a), battlefield(b) {}
+    Wombat(std::string n, T h, T s, T m, T str, T d, T l, Weapon<T>* w, Armor<T>* a, Battlefield<T> &b) : name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l), weapon(w), armor(a), battlefield(b) {}
 
     void stats() const{
         std::cout
@@ -103,7 +148,6 @@ public:
 
     void wait(){
         stats();
-        std::cout << "Wywoluje wait" << std::endl;
         current_stamina = std::min(stamina, current_stamina + stamina_restore);
         current_mana = std::min(mana, current_mana + mana_restore);
     }
@@ -124,6 +168,9 @@ public:
         std:: cout << "------------------------------------------------" << std:: endl;
 
         std:: cout << "Wybierz jeden z ponizszych ruchow" << std:: endl;
+        for (const auto& move : info_moves) {
+            std::cout << move.first << std::endl;
+        }
         for (const auto& move : moves) {
             std::cout << move.first << std::endl;
         }
@@ -147,8 +194,9 @@ public:
             std::getline(std::cin, chosen_move);
 
             std::cout << std::endl << "Wybrano ruch: " << chosen_move << std::endl;
-
-            if (this->moves.contains(chosen_move)) {
+            if (this->info_moves.contains(chosen_move)){
+                this->info_moves[chosen_move]();
+            } else if (this->moves.contains(chosen_move)) {
                 this->moves[chosen_move]();
                 this->passive();
                 break;
@@ -199,9 +247,9 @@ public:
     virtual void deal_dmg(Wombat<T>& attacker, Wombat<T>& defender){
         T def = 0;
         if(type==physical){
-            def = defender.armour->physical_def;
+            def = defender.armor->physical_def;
         } else {
-            def = defender.armour->magical_def;
+            def = defender.armor->magical_def;
         }
         T dmg = std::max(attacker.strength * scaling_strength + attacker.dex * scaling_dex - def, 0);
         std::cout << "Zadales " << dmg << " obrazen" << std::endl;
@@ -229,6 +277,10 @@ public:
 
     }
 
+    [[nodiscard]] std::string info() const {
+        return "zasieg: " + std::to_string(min_range) + "-" + std::to_string(max_range) + ", koszt many: " + std::to_string(mana_cost) + " ,koszt staminy: " + std::to_string(stamina_cost);
+    }
+
 };
 
 template <Numeric T>
@@ -241,6 +293,12 @@ public:
         std::cout << std::endl << "Dostepne ataki:" << std::endl;
         for (const auto& elem : this->attacks) {
             std::cout << elem.first << std::endl;
+        }
+    }
+
+    void print_attacks_stats() {
+        for (const auto& elem : this->attacks) {
+            std::cout << elem.first << " => " << elem.second.info() << std::endl;
         }
     }
 
@@ -332,7 +390,7 @@ public:
 template <Numeric T>
 class WomKnight : public Wombat<T>{
 public:
-    WomKnight(std::string n, ColdWeapon<T>* w, HeavyArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 50, 10, 5, 5, 4, 2, w, a, b) {}
+    WomKnight(std::string n, ColdWeapon<T>* w, HeavyArmor<T>* a, Battlefield<T>& b) : Wombat<T>(n, 50, 10, 5, 5, 4, 2, w, a, b) {}
 
     void passive() override{
         this->reduce_distance();
@@ -345,7 +403,7 @@ public:
 template <Numeric T>
 class WoArcher : public Wombat<T>{
 public:
-    WoArcher(std::string n, DistanceWeapon<T>* w, LightArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 45, 7, 10, 2, 6, 3, w, a, b) {}
+    WoArcher(std::string n, DistanceWeapon<T>* w, LightArmor<T>* a, Battlefield<T>& b) : Wombat<T>(n, 45, 7, 10, 2, 6, 3, w, a, b) {}
 
     void increase_distance() override;
 
@@ -370,18 +428,24 @@ public:
         current_distance = std::min(max_distance, current_distance + distance);
     }
 
-    Weapon<T>* choose_weapon(std::map<std::string, Weapon<T>*> weapons){
-        std::cout<<"Wybierz jedna z ponizszych broni" << std::endl;
 
-        for (const auto& elem : weapons) {
+    template <WeaponArmor<T> U>
+    U choose_item(std::map<std::string, U> items){
+        for (const auto& elem : items) {
             std::cout << elem.first << std::endl;
         }
-        std::string chosen_weapon;
-        std::cin >> chosen_weapon;
-        std::cout << std::endl;
-        std::cout << "Wybrales: " << chosen_weapon << std::endl;
+        while(true){
+            std::string chosen;
+            std::getline(std::cin, chosen);
+            std::cout << std::endl;
+            if(items.contains(chosen)){
+                std::cout << "Wybrales: " << chosen << std::endl << std::endl;
+                return items.at(chosen);
+            } else {
+                std::cout << "Niestety item: " << chosen << " nie istnieje, sprobuj jeszcze raz" << std::endl << std::endl;
 
-        return weapons.at(chosen_weapon);
+            }
+        }
 
     }
     Wombat<T>* create_wombat(const std::string& name){
@@ -407,10 +471,17 @@ public:
                                 {"Morgenstern", new Morgenstern<T>()},
                                 {"Koncerz", new Koncerz<T>()}
                         };
+                        std::cout << "Wybierz bron: " << std::endl;
+                        auto* weapon = static_cast<ColdWeapon<T> *>(this->choose_item(weapons));
 
-                        ColdWeapon<T>* weapon = static_cast<ColdWeapon<int> *>(this->choose_weapon(weapons));
-                        auto armour = new HeavyArmour<T>();
-                        return new WomKnight(name, weapon, armour, *this);
+                        std::map<std::string, Armor<T>*> armors{
+                                {"Zbroja Havla", new HavelArmor<T>()},
+                                {"Zbroja Elity Rycerstwa", new EliteKnightArmor<T>()}
+                        };
+
+                        std::cout << "Wybierz ciezki pancerz: " << std::endl;
+                        auto* armor = static_cast<HeavyArmor<T> *>(this->choose_item(armors));
+                        return new WomKnight(name, weapon, armor, *this);
                     }
                     case 1: {
                         std::cout << "Wybrales Lucznika" << std::endl;
@@ -420,10 +491,18 @@ public:
                                 {"Proca", new Slingshot<T>()}
                         };
 
+                        std::cout << "Wybierz bron: " << std::endl;
+                        DistanceWeapon<T>* weapon = static_cast<DistanceWeapon<int> *>(this->choose_item(weapons));
 
-                        DistanceWeapon<T>* weapon = static_cast<DistanceWeapon<int> *>(this->choose_weapon(weapons));
-                        auto armour = new LightArmour<T>();
-                        return new WoArcher(name, weapon, armour, *this);
+                        std::cout << "Wybierz lekki pancerz: " << std::endl;
+
+                        std::map<std::string, Armor<T>*> armors{
+                                {"Zbroja Zlodzieja", new ThiefArmor<T>()},
+                                {"Zbroja Lowcy", new HunterArmor<T>()}
+                        };
+
+                        auto* armor = static_cast<LightArmor<T> *>(this->choose_item(armors));
+                        return new WoArcher(name, weapon, armor, *this);
                     }
 
                 }
@@ -450,6 +529,8 @@ public:
         while(true){
             std::cout << "Tura " << player1->name << std::endl;
             std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
+            std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
+
 
             player1->choose_move(*player2, current_distance);
 
@@ -496,17 +577,33 @@ inline void WoArcher<T>::increase_distance() {
 
 
 template <Numeric T>
-inline void LightArmour<T>::effect(Wombat<T> &wombat) {
+inline void HunterArmor<T>::effect(Wombat<T> &wombat) {
     wombat.dex += 5;
+    wombat.current_stamina = std::min(wombat.stamina, wombat.stamina + 5);
+}
+
+template <Numeric T>
+inline void ThiefArmor<T>::effect(Wombat<T> &wombat) {
+    wombat.dex += 15;
+    wombat.health = std::max(wombat.health - 10, 1);
     wombat.current_stamina = std::min(wombat.stamina, wombat.stamina + 5);
 }
 
 
 template <Numeric T>
-inline void HeavyArmour<T>::effect(Wombat<T> &wombat) {
+inline void HavelArmor<T>::effect(Wombat<T> &wombat) {
     wombat.dex = std::max(0, wombat.dex - 5);
+    wombat.strength += 4;
     wombat.stamina = std::max(0, wombat.stamina - 5);
 }
+
+template <Numeric T>
+inline void EliteKnightArmor<T>::effect(Wombat<T> &wombat) {
+    wombat.dex = std::max(0, wombat.dex - 4);
+    wombat.health += 15;
+    wombat.stamina = std::max(0, wombat.stamina - 5);
+}
+
 int main() {
     Battlefield<int> battlefield;
     battlefield.game();
