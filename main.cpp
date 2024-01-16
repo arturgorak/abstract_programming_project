@@ -11,13 +11,38 @@
 template <typename T>
 concept Numeric = std::is_arithmetic<T>::value;
 
+enum DamageType {magical, physical};
+
 template <Numeric T>
 class Battlefield;
 
+template <Numeric T>
+class Wombat;
+
+template <Numeric T>
 class Armour{
-    int magical_def;
 public:
-    int physical_def;
+    T magical_def;
+    T physical_def;
+
+    Armour(T md, T pd): magical_def(md), physical_def(pd) {}
+
+    virtual void effect(Wombat<T>& defender){};
+};
+
+template <Numeric T>
+class LightArmour : public Armour<T>{
+public:
+    LightArmour(): Armour<T>(2, 2){}
+    void effect(Wombat<T>& wombat);
+};
+
+template <Numeric T>
+class HeavyArmour: public Armour<T>{
+public:
+    HeavyArmour(): Armour<T>(5, 5){}
+    void effect(Wombat<T>& wombat);
+
 };
 
 
@@ -41,14 +66,14 @@ public:
 
     };
 
-    Armour armour{};
 //    status* statuses{};
     Battlefield<T>& battlefield;
+    Armour<T>* armour;
 
     T stamina_restore = 5;
     T mana_restore = 5;
 
-    Wombat(std::string n, T h, T s, T m, T str, T d, T l, Battlefield<T> &b) :name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l), battlefield(b) {}
+    Wombat(std::string n, T h, T s, T m, T str, T d, T l, Armour<T>* a, Battlefield<T> &b) :name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l),armour(a), battlefield(b) {}
 
     void stats() const{
         std::cout
@@ -109,6 +134,7 @@ class Attack{
 public:
     int min_range;
     int max_range;
+    DamageType type;
     T scaling_dex;
     T scaling_strength;
     T mana_cost;
@@ -116,12 +142,13 @@ public:
 
 
     Attack(
+            DamageType type,
             int min_range,
             int max_range,
             int scaling_dex,
             int scaling_strength,
             int mana_cost,
-            int stamina_cost) : min_range(min_range), max_range(max_range), scaling_dex(scaling_dex), scaling_strength(scaling_strength), mana_cost(mana_cost), stamina_cost(stamina_cost) {}
+            int stamina_cost) :type(type), min_range(min_range), max_range(max_range), scaling_dex(scaling_dex), scaling_strength(scaling_strength), mana_cost(mana_cost), stamina_cost(stamina_cost) {}
 
     bool check_available(int distance){
         return distance >= min_range and distance <= max_range;
@@ -131,8 +158,14 @@ public:
         return mana_cost <= attacker.mana and stamina_cost <= attacker.stamina;
     }
 
-    void deal_dmg(Wombat<T>& attacker, Wombat<T>& defender){
-        T dmg = attacker.strength * scaling_strength + attacker.dex * scaling_dex;
+    virtual void deal_dmg(Wombat<T>& attacker, Wombat<T>& defender){
+        T def = 0;
+        if(type==physical){
+            def = defender.armour->physical_def;
+        } else {
+            def = defender.armour->magical_def;
+        }
+        T dmg = std::max(attacker.strength * scaling_strength + attacker.dex * scaling_dex - def, 0);
         defender.health -= dmg;
     }
 
@@ -153,7 +186,7 @@ public:
 
         }
 
-        deal_dmg(attacker, defender);
+        this->deal_dmg(attacker, defender);
 
     }
 
@@ -186,9 +219,9 @@ template <Numeric T>
 class Sword : public Weapon<T> {
 public:
     std::map<std::string, Attack<T>> attacks{
-            {"Blisko", Attack<T>(0, 4, 4, 0, 0, 3)},
-            {"Srednio", Attack<T>(3, 6, 2, 2, 0, 5)},
-            {"Daleko", Attack<T>(5, 9, 0, 4, 0, 7)},
+            {"Blisko", Attack<T>(physical, 0, 4, 4, 0, 0, 3)},
+            {"Srednio", Attack<T>(physical,3, 6, 2, 2, 0, 5)},
+            {"Daleko", Attack<T>(physical,5, 9, 0, 4, 0, 7)},
     };
 
     Sword() : Weapon<T>(attacks) {}
@@ -200,9 +233,9 @@ class Bow: public Weapon<T>{
 public:
 
     std::map<std::string, Attack<T>> attacks{
-            {"Slaby", Attack<T>(7, 13, 6, 0, 0, 3)},
-            {"Mocny", Attack<T>( 10, 17, 4, 2, 0, 5)},
-            {"Sniper", Attack<T>(15, 20, 4, 4, 0, 7)},
+            {"Slaby", Attack<T>(physical, 7, 13, 6, 0, 0, 3)},
+            {"Mocny", Attack<T>(physical, 10, 17, 4, 2, 0, 5)},
+            {"Sniper", Attack<T>(physical,15, 20, 4, 4, 0, 7)},
     };
 
     Bow() : Weapon<T>(attacks) {}
@@ -214,7 +247,7 @@ class WomKnight : public Wombat<T>{
     Sword<T>* weapon;
 
 public:
-    WomKnight(std::string n, Sword<T>* w, Battlefield<T>& b) : Wombat<T>(n, 10, 10, 5,5, 4, 2, b), weapon(w) {}
+    WomKnight(std::string n, Sword<T>* w, HeavyArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 10, 10, 5,5, 4, 2, a, b), weapon(w) {}
 
     void reduce_distance();
 
@@ -257,7 +290,7 @@ template <Numeric T>
 class WoArcher : public Wombat<T>{
 public:
     Bow<T>* weapon;
-    WoArcher(std::string n, Bow<T>* w, Battlefield<T>& b) : Wombat<T>(n, 7, 7, 10,2, 6, 3, b), weapon(w) {}
+    WoArcher(std::string n, Bow<T>* w,LightArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 7, 7, 10,2, 6, 3, a, b), weapon(w) {}
 
     void increase_distance();
 
@@ -328,12 +361,14 @@ public:
                     case 0: {
                         std::cout << "You choose Knight" << std::endl;
                         auto sword = new Sword<T>();
-                        return new WomKnight(name, sword, *this);
+                        auto armour = new HeavyArmour<T>();
+                        return new WomKnight(name, sword, armour, *this);
                     }
                     case 1: {
                         std::cout << "You choose Archer" << std::endl;
                         auto bow = new Bow<T>();
-                        return new WoArcher(name, bow, *this);
+                        auto armour = new LightArmour<T>();
+                        return new WoArcher(name, bow, armour, *this);
                     }
 
                 }
@@ -404,6 +439,19 @@ inline void WoArcher<T>::increase_distance() {
     this->battlefield.increase_distance(this->dex * 2);
 }
 
+
+template <Numeric T>
+inline void LightArmour<T>::effect(Wombat<T> &wombat) {
+    wombat.dex += 5;
+    wombat.current_stamina = std::min(wombat.stamina, wombat.stamina + 5);
+}
+
+
+template <Numeric T>
+inline void HeavyArmour<T>::effect(Wombat<T> &wombat) {
+    wombat.dex = std::max(0, wombat.dex - 5);
+    wombat.stamina = std::max(0, wombat.stamina - 5);
+}
 int main() {
     Battlefield<int> battlefield;
     battlefield.game();
