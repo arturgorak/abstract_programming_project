@@ -20,6 +20,9 @@ template <Numeric T>
 class Wombat;
 
 template <Numeric T>
+class Weapon;
+
+template <Numeric T>
 class Armour{
 public:
     T magical_def;
@@ -60,20 +63,21 @@ public:
     T luck;
 
     std::map<std::string, std::function<void()>> moves{
-            {"wait", [this]() { wait(); }},
-            {"reduce-distance", [this]() { reduce_distance(); }},
-            {"increase-distance", [this]() { increase_distance(); }},
+            {"czekaj", [this]() { this->wait(); }},
+            {"zmniejsz dystans", [this]() { this->reduce_distance(); }},
+            {"zwieksz dystans", [this]() { this->increase_distance(); }},
 
     };
 
 //    status* statuses{};
     Battlefield<T>& battlefield;
     Armour<T>* armour;
+    Weapon<T>* weapon;
 
     T stamina_restore = 5;
     T mana_restore = 5;
 
-    Wombat(std::string n, T h, T s, T m, T str, T d, T l, Armour<T>* a, Battlefield<T> &b) :name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l),armour(a), battlefield(b) {}
+    Wombat(std::string n, T h, T s, T m, T str, T d, T l,Weapon<T>* w, Armour<T>* a, Battlefield<T> &b) :name(std::move(n)), health(h), current_stamina(1), stamina(s), current_mana(1), mana(m), strength(str), dex(d), luck(l), weapon(w), armour(a), battlefield(b) {}
 
     void stats() const{
         std::cout
@@ -104,29 +108,63 @@ public:
         current_mana = std::min(mana, current_mana + mana_restore);
     }
 
-    void reduce_distance();
-    void increase_distance();
+    virtual void reduce_distance();
+
+    virtual void increase_distance();
 
     void base_moves_explain(){
         std::cout
-        << "help - wytłumaczenie ruchow" << std::endl
+        << "help - wytlumaczenie ruchow" << std::endl
         << "wait - regeneracja " << stamina_restore << " punktow staminy oraz " << mana_restore << " punktow many" << std::endl
         << "reduce distance - zmniejszenie odległości do przeciwnika o " << dex << " jednostek" << std::endl
         << "increase distance - zwiekszenie odległości do przeciwnika o " << dex << " jednostek" << std::endl;
     }
 
     virtual void print_moves(){
+        std:: cout << "------------------------------------------------" << std:: endl;
+
         std:: cout << "Wybierz jeden z ponizszych ruchow" << std:: endl;
         for (const auto& move : moves) {
             std::cout << move.first << std::endl;
         }
 
     }
-    virtual void choose_move(Wombat& defender, int distance){};
 
     bool is_dead(){
         return(health <= 0);
     }
+
+    virtual void passive(){}
+
+    void choose_move(Wombat<T>& defender, int distance){
+
+        this->print_moves();
+        this->weapon->print_attacks_names();
+
+        while (true) {
+            std::string chosen_move;
+            std::cout << "Wybierz ruch: ";
+            std::getline(std::cin, chosen_move);
+
+            std::cout << std::endl << "Wybrano ruch: " << chosen_move << std::endl;
+
+            if (this->moves.contains(chosen_move)) {
+                this->moves[chosen_move]();
+                this->passive();
+                break;
+
+            } else if(weapon->contains(chosen_move)){
+                this->weapon->process_move(chosen_move, *this, defender, distance);
+                this->passive();
+                break;
+
+            } else {
+                std::cout << "Prosze podac ponownie, ruch " << chosen_move << " jest niepoprawny" << std::endl;
+            }
+        }
+
+    }
+
 };
 
 template <Numeric T>
@@ -166,6 +204,7 @@ public:
             def = defender.armour->magical_def;
         }
         T dmg = std::max(attacker.strength * scaling_strength + attacker.dex * scaling_dex - def, 0);
+        std::cout << "Zadales " << dmg << " obrazen" << std::endl;
         defender.health -= dmg;
     }
 
@@ -216,112 +255,99 @@ public:
 };
 
 template <Numeric T>
-class Sword : public Weapon<T> {
+class ColdWeapon : public Weapon<T> {
+public:
+    explicit ColdWeapon(std::map<std::string, Attack<T>>& attacks) : Weapon<T>(attacks) {}
+};
+
+template <Numeric T>
+class Falchion: public ColdWeapon<T>{
 public:
     std::map<std::string, Attack<T>> attacks{
-            {"Blisko", Attack<T>(physical, 0, 4, 4, 0, 0, 3)},
-            {"Srednio", Attack<T>(physical,3, 6, 2, 2, 0, 5)},
-            {"Daleko", Attack<T>(physical,5, 9, 0, 4, 0, 7)},
+            {"bliski atak", Attack<T>(physical, 0, 4, 4, 0, 0, 3)},
+            {"magiczny atak", Attack<T>(magical,3, 6, 2, 2, 1, 5)},
+            {"daleki atak", Attack<T>(physical,5, 9, 0, 4, 0, 7)},
     };
 
-    Sword() : Weapon<T>(attacks) {}
+    Falchion(): ColdWeapon<T>(attacks){}
+
+};
+
+
+template <Numeric T>
+class Morgenstern: public ColdWeapon<T>{
+public:
+    std::map<std::string, Attack<T>> attacks{
+            {"bliski zamach", Attack<T>(physical, 0, 5, 4, 3, 0, 3)},
+            {"dalekie uderzenie", Attack<T>(physical,4, 7, 2, 5, 0, 7)},
+    };
+
+    Morgenstern(): ColdWeapon<T>(attacks){}
 
 };
 
 template <Numeric T>
-class Bow: public Weapon<T>{
+class Koncerz: public ColdWeapon<T>{
 public:
-
     std::map<std::string, Attack<T>> attacks{
-            {"Slaby", Attack<T>(physical, 7, 13, 6, 0, 0, 3)},
-            {"Mocny", Attack<T>(physical, 10, 17, 4, 2, 0, 5)},
-            {"Sniper", Attack<T>(physical,15, 20, 4, 4, 0, 7)},
+            {"szybkie ciecie", Attack<T>(magical, 0, 5, 2, 2, 0, 2)},
+            {"daleki atak", Attack<T>(magical,5, 7, 1, 6, 2, 6)},
     };
 
-    Bow() : Weapon<T>(attacks) {}
+    Koncerz(): ColdWeapon<T>(attacks){}
 
 };
+
+template <Numeric T>
+class DistanceWeapon: public Weapon<T>{
+public:
+    explicit DistanceWeapon(std::map<std::string, Attack<T>>& attacks) : Weapon<T>(attacks) {}
+};
+
+
+template <Numeric T>
+class Bow: public DistanceWeapon<T>{
+public:
+    std::map<std::string, Attack<T>> attacks{
+            {"Slaby strzal", Attack<T>(physical, 7, 13, 6, 0, 0, 3)},
+            {"Mocny strzal", Attack<T>(physical, 10, 17, 4, 2, 0, 5)},
+            {"Sniperski strzal", Attack<T>(physical,15, 20, 4, 4, 0, 7)},
+    };
+    Bow() : DistanceWeapon<T>(attacks) {}
+};
+
+template <Numeric T>
+class Slingshot: public DistanceWeapon<T>{
+public:
+    std::map<std::string, Attack<T>> attacks{
+            {"Bliski strzal", Attack<T>(physical, 0, 10, 6, 0, 0, 3)},
+            {"Naladowany strzal", Attack<T>(physical, 7, 17, 6, 2, 0, 5)},
+            {"Naladowany magiczny strzal", Attack<T>(magical,7, 20, 6, 4, 2, 5)},
+    };
+    Slingshot() : DistanceWeapon<T>(attacks) {}
+};
+
+
 
 template <Numeric T>
 class WomKnight : public Wombat<T>{
-    Sword<T>* weapon;
-
 public:
-    WomKnight(std::string n, Sword<T>* w, HeavyArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 10, 10, 5,5, 4, 2, a, b), weapon(w) {}
+    WomKnight(std::string n, ColdWeapon<T>* w, HeavyArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 50, 10, 5, 5, 4, 2, w, a, b) {}
 
-    void reduce_distance();
-
-    void choose_move(Wombat<T>& defender, int distance){
-        std::cout << "status" << std::endl;
-        this->print_moves();
-        this->weapon->print_attacks_names();
-
-        while (true) {
-            std::string chosen_move;
-            std::cout << "Wybierz ruch: ";
-            std::cin >> chosen_move;
-
-            std::cout << std::endl << "Wybrano ruch: " << chosen_move << std::endl;
-
-            if(chosen_move == "status"){ //TODO repair
-                this->stats();
-                std::cout << "Prosze podac ponownie ruch"  << std::endl;
-            } else if (this->moves.contains(chosen_move)) {
-                this->moves[chosen_move]();
-                this->reduce_distance();
-                break;
-
-            } else if(weapon->contains(chosen_move)){
-                this->weapon->process_move(chosen_move, *this, defender, distance);
-                this->reduce_distance();
-                break;
-
-            } else {
-                std::cout << "Prosze podac ponownie, ruch " << chosen_move << " jest niepoprawny" << std::endl;
-            }
-        }
-
+    void passive() override{
+        this->reduce_distance();
     }
 
+    void reduce_distance() override;
 
 };
 
 template <Numeric T>
 class WoArcher : public Wombat<T>{
 public:
-    Bow<T>* weapon;
-    WoArcher(std::string n, Bow<T>* w,LightArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 7, 7, 10,2, 6, 3, a, b), weapon(w) {}
+    WoArcher(std::string n, DistanceWeapon<T>* w, LightArmour<T>* a, Battlefield<T>& b) : Wombat<T>(n, 45, 7, 10, 2, 6, 3, w, a, b) {}
 
-    void increase_distance();
-
-    void choose_move(Wombat<T>& defender, int distance){
-        this->print_moves();
-        this->weapon->print_attacks_names();
-
-        while (true) {
-            std::string chosen_move;
-            std::cout << "Wybierz ruch: ";
-            std::cin >> chosen_move;
-
-            std::cout << std::endl << "Wybrano ruch: " << chosen_move << std::endl;
-
-            if (this->moves.contains(chosen_move)) {
-                this->moves[chosen_move]();
-                this->increase_distance();
-                break;
-
-            } else if(weapon->contains(chosen_move)){
-                this->weapon->process_move(chosen_move, *this, defender, distance);
-                this->increase_distance();
-                break;
-
-            } else {
-                std::cout << "Prosze podac ponownie, ruch " << chosen_move << " jest niepoprawny" << std::endl;
-            }
-        }
-
-    }
-
+    void increase_distance() override;
 
 };
 
@@ -343,6 +369,21 @@ public:
     void increase_distance(int distance){
         current_distance = std::min(max_distance, current_distance + distance);
     }
+
+    Weapon<T>* choose_weapon(std::map<std::string, Weapon<T>*> weapons){
+        std::cout<<"Wybierz jedna z ponizszych broni" << std::endl;
+
+        for (const auto& elem : weapons) {
+            std::cout << elem.first << std::endl;
+        }
+        std::string chosen_weapon;
+        std::cin >> chosen_weapon;
+        std::cout << std::endl;
+        std::cout << "Wybrales: " << chosen_weapon << std::endl;
+
+        return weapons.at(chosen_weapon);
+
+    }
     Wombat<T>* create_wombat(const std::string& name){
         auto kv = std::views::keys(classes);
 
@@ -356,19 +397,33 @@ public:
             std::cout << std::endl;
 
             if (classes.contains(chosen_class)) {
-
                 switch (classes[chosen_class]) {
                     case 0: {
-                        std::cout << "You choose Knight" << std::endl;
-                        auto sword = new Sword<T>();
+                        std::cout << "Wybrales rycerza" << std::endl;
+
+
+                        std::map<std::string, Weapon<T>*> weapons{
+                                {"Falchion", new Falchion<T>()},
+                                {"Morgenstern", new Morgenstern<T>()},
+                                {"Koncerz", new Koncerz<T>()}
+                        };
+
+                        ColdWeapon<T>* weapon = static_cast<ColdWeapon<int> *>(this->choose_weapon(weapons));
                         auto armour = new HeavyArmour<T>();
-                        return new WomKnight(name, sword, armour, *this);
+                        return new WomKnight(name, weapon, armour, *this);
                     }
                     case 1: {
-                        std::cout << "You choose Archer" << std::endl;
-                        auto bow = new Bow<T>();
+                        std::cout << "Wybrales Lucznika" << std::endl;
+
+                        std::map<std::string, Weapon<T>*> weapons{
+                                {"Luk", new Bow<T>()},
+                                {"Proca", new Slingshot<T>()}
+                        };
+
+
+                        DistanceWeapon<T>* weapon = static_cast<DistanceWeapon<int> *>(this->choose_weapon(weapons));
                         auto armour = new LightArmour<T>();
-                        return new WoArcher(name, bow, armour, *this);
+                        return new WoArcher(name, weapon, armour, *this);
                     }
 
                 }
@@ -394,7 +449,7 @@ public:
 
         while(true){
             std::cout << "Tura " << player1->name << std::endl;
-            std::cout << "Obecny dystacs wynosi: " << current_distance << std::endl;
+            std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
 
             player1->choose_move(*player2, current_distance);
 
@@ -404,7 +459,7 @@ public:
             }
 
             std::cout << "Tura " << player2->name << std::endl;
-            std::cout << "Obecny dystacs wynosi: " << current_distance << std::endl;
+            std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
             player2->choose_move(*player1, current_distance);
 
 
