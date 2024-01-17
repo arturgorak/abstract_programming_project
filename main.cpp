@@ -11,18 +11,40 @@
 template <typename T>
 concept Numeric = std::is_arithmetic<T>::value;
 
+template <typename T>
+concept Add= requires ( T a , T b ) {
+    a + b;
+};
+
+template <typename T>
+concept Sub = requires ( T a , T b ) {
+    a - b;
+};
+
+template <typename T>
+concept SubAdd = requires (T a) { Add<T> && Sub<T>; };
+
+template <typename T>
+concept Mult = requires ( T a , T b ) {
+    a*b;
+};
+
+template <typename T>
+concept SubAddMult = requires (T a) { Add<T> && Sub<T> && Mult<T>; };
+
+
 enum DamageType {magical, physical};
 
-template <Numeric T>
+template <SubAddMult T>
 class Battlefield;
 
-template <Numeric T>
+template <SubAddMult T>
 class Wombat;
 
-template <Numeric T>
+template <SubAddMult T>
 class Weapon;
 
-template <Numeric T>
+template <SubAdd T>
 class Armor{
 public:
     T magical_def;
@@ -33,13 +55,13 @@ public:
     virtual void effect(Wombat<T>& defender){};
 };
 
-template <Numeric T>
+template <SubAdd T>
 class LightArmor : public Armor<T>{
 public:
     LightArmor(T md, T pd): Armor<T>(md, pd){}
 };
 
-template <Numeric T>
+template <SubAdd T>
 class ThiefArmor : public LightArmor<T>{
 public:
     ThiefArmor(): LightArmor<T>(2, 4){}
@@ -47,14 +69,14 @@ public:
 };
 
 
-template <Numeric T>
+template <SubAdd T>
 class HunterArmor : public LightArmor<T>{
 public:
     HunterArmor(): LightArmor<T>(3, 3){}
     void effect(Wombat<T>& wombat);
 };
 
-template <Numeric T>
+template <SubAdd T>
 class HeavyArmor: public Armor<T>{
 public:
     HeavyArmor(T md, T pd): Armor<T>(md, pd){}
@@ -62,7 +84,7 @@ public:
 };
 
 
-template <Numeric T>
+template <SubAdd T>
 class HavelArmor: public HeavyArmor<T>{
 public:
     HavelArmor(): HeavyArmor<T>(7, 7){}
@@ -70,7 +92,7 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAdd T>
 class EliteKnightArmor: public HeavyArmor<T>{
 public:
     EliteKnightArmor(): HeavyArmor<T>(5, 5){}
@@ -78,17 +100,13 @@ public:
 
 };
 
-//template <Numeric U>
-//template <typename T>
-//concept WeaponArmor = std::is_same_v<T, Armor<U>*> || std::is_same_v<T, Weapon<U>*>;
-//
 
 template <typename T, typename U>
-concept WeaponArmor = (std::is_same_v<T, Armor<U>*> || std::is_same_v<T, Weapon<U>*>) && std::is_arithmetic<U>::value;
+concept WeaponArmor = (std::is_same_v<T, Armor<U>*> || std::is_same_v<T, Weapon<U>*>) && SubAddMult<U>;
 
 
 
-template <Numeric T>
+template <SubAddMult T>
 class Wombat{
 public:
     std::string name;
@@ -114,7 +132,6 @@ public:
 
     };
 
-//    status* statuses{};
     Battlefield<T>& battlefield;
     Armor<T>* armor;
     Weapon<T>* weapon;
@@ -136,7 +153,7 @@ public:
         << std::endl;
     }
 
-    bool operator<(const Wombat& other) const {
+    bool operator>(const Wombat& other) const {
         if (this->dex != other.dex) {
             return this->dex > other.dex;
         }
@@ -156,21 +173,18 @@ public:
 
     virtual void increase_distance();
 
-    void base_moves_explain(){
-        std::cout
-        << "help - wytlumaczenie ruchow" << std::endl
-        << "wait - regeneracja " << stamina_restore << " punktow staminy oraz " << mana_restore << " punktow many" << std::endl
-        << "reduce distance - zmniejszenie odległości do przeciwnika o " << dex << " jednostek" << std::endl
-        << "increase distance - zwiekszenie odległości do przeciwnika o " << dex << " jednostek" << std::endl;
-    }
-
     virtual void print_moves(){
         std:: cout << "------------------------------------------------" << std:: endl;
 
-        std:: cout << "Wybierz jeden z ponizszych ruchow" << std:: endl;
+        std:: cout << "Wybierz jeden z ponizszych ruchow:" << std:: endl;
+        std:: cout << "Ruchy nie konczace tury:" << std:: endl;
+
         for (const auto& move : info_moves) {
             std::cout << move.first << std::endl;
         }
+        std:: cout  << std:: endl;
+        std:: cout << "Ponizsze ruchy koncza ture:" << std:: endl;
+
         for (const auto& move : moves) {
             std::cout << move.first << std::endl;
         }
@@ -215,7 +229,7 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class Attack{
 public:
     int min_range;
@@ -231,17 +245,17 @@ public:
             DamageType type,
             int min_range,
             int max_range,
-            int scaling_dex,
-            int scaling_strength,
-            int mana_cost,
-            int stamina_cost) :type(type), min_range(min_range), max_range(max_range), scaling_dex(scaling_dex), scaling_strength(scaling_strength), mana_cost(mana_cost), stamina_cost(stamina_cost) {}
+            T scaling_dex,
+            T scaling_strength,
+            T mana_cost,
+            T stamina_cost) :type(type), min_range(min_range), max_range(max_range), scaling_dex(scaling_dex), scaling_strength(scaling_strength), mana_cost(mana_cost), stamina_cost(stamina_cost) {}
 
     bool check_available(int distance){
         return distance >= min_range and distance <= max_range;
     }
 
     bool check_resources(Wombat<T>& attacker){
-        return mana_cost <= attacker.mana and stamina_cost <= attacker.stamina;
+        return mana_cost <= attacker.current_mana and stamina_cost <= attacker.current_stamina;
     }
 
     virtual void deal_dmg(Wombat<T>& attacker, Wombat<T>& defender){
@@ -264,8 +278,8 @@ public:
 
         }
 
-        attacker.stamina -= stamina_cost;
-        attacker.mana -= mana_cost;
+        attacker.current_stamina -= stamina_cost;
+        attacker.current_mana -= mana_cost;
 
         if(not check_available(distance)){
             std::cout << "Chybiono: Cel znajduje sie w odleglosci " << distance << ", podczas gdy atak ma zasieg " << min_range << " do " << max_range << std:: endl;
@@ -283,7 +297,7 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class Weapon{
     std::map<std::string, Attack<T>>& attacks;
 public:
@@ -312,13 +326,13 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class ColdWeapon : public Weapon<T> {
 public:
     explicit ColdWeapon(std::map<std::string, Attack<T>>& attacks) : Weapon<T>(attacks) {}
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class Falchion: public ColdWeapon<T>{
 public:
     std::map<std::string, Attack<T>> attacks{
@@ -332,7 +346,7 @@ public:
 };
 
 
-template <Numeric T>
+template <SubAddMult T>
 class Morgenstern: public ColdWeapon<T>{
 public:
     std::map<std::string, Attack<T>> attacks{
@@ -344,7 +358,7 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class Koncerz: public ColdWeapon<T>{
 public:
     std::map<std::string, Attack<T>> attacks{
@@ -356,38 +370,38 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class DistanceWeapon: public Weapon<T>{
 public:
     explicit DistanceWeapon(std::map<std::string, Attack<T>>& attacks) : Weapon<T>(attacks) {}
 };
 
 
-template <Numeric T>
+template <SubAddMult T>
 class Bow: public DistanceWeapon<T>{
 public:
     std::map<std::string, Attack<T>> attacks{
-            {"Slaby strzal", Attack<T>(physical, 7, 13, 6, 0, 0, 3)},
-            {"Mocny strzal", Attack<T>(physical, 10, 17, 4, 2, 0, 5)},
-            {"Sniperski strzal", Attack<T>(physical,15, 20, 4, 4, 0, 7)},
+            {"slaby strzal", Attack<T>(physical, 7, 13, 6, 0, 0, 3)},
+            {"mocny strzal", Attack<T>(physical, 10, 17, 4, 2, 0, 5)},
+            {"snajperski strzal", Attack<T>(physical,15, 20, 4, 4, 0, 7)},
     };
     Bow() : DistanceWeapon<T>(attacks) {}
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class Slingshot: public DistanceWeapon<T>{
 public:
     std::map<std::string, Attack<T>> attacks{
-            {"Bliski strzal", Attack<T>(physical, 0, 10, 6, 0, 0, 3)},
-            {"Naladowany strzal", Attack<T>(physical, 7, 17, 6, 2, 0, 5)},
-            {"Naladowany magiczny strzal", Attack<T>(magical,7, 20, 6, 4, 2, 5)},
+            {"bliski strzal", Attack<T>(physical, 0, 10, 6, 0, 0, 3)},
+            {"naladowany strzal", Attack<T>(physical, 7, 17, 6, 2, 0, 5)},
+            {"naladowany magiczny strzal", Attack<T>(magical,7, 20, 6, 4, 2, 5)},
     };
     Slingshot() : DistanceWeapon<T>(attacks) {}
 };
 
 
 
-template <Numeric T>
+template <SubAddMult T>
 class WomKnight : public Wombat<T>{
 public:
     WomKnight(std::string n, ColdWeapon<T>* w, HeavyArmor<T>* a, Battlefield<T>& b) : Wombat<T>(n, 50, 10, 5, 5, 4, 2, w, a, b) {}
@@ -400,7 +414,7 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class WoArcher : public Wombat<T>{
 public:
     WoArcher(std::string n, DistanceWeapon<T>* w, LightArmor<T>* a, Battlefield<T>& b) : Wombat<T>(n, 45, 7, 10, 2, 6, 3, w, a, b) {}
@@ -409,7 +423,7 @@ public:
 
 };
 
-template <Numeric T>
+template <SubAddMult T>
 class Battlefield{
 
     int current_distance = 10;
@@ -515,37 +529,40 @@ public:
 
     }
 
+    void turn(Wombat<T>* first, Wombat<T>* second){
+        std:: cout << "------------------------------------------------" << std:: endl;
+        std::cout << "Tura " << first->name << std::endl;
+        std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
+
+        first->choose_move(*second, current_distance);
+
+    }
+
     void game(){
         std::cout << "-------PLAYER 1------" << std::endl;
         Wombat<T>* player1 = create_wombat("Player 1");
 
-
         std::cout << "-------PLAYER 2------" << std::endl;
-
         Wombat<T>* player2 = create_wombat("Player 2");
 
+
         std::cout << "-------FIGHT------" << std::endl;
+        Wombat<T>* first, *second;
+
+        std::tie(first, second) = (*player1 > *player2) ? std::make_pair(player1, player2) : std::make_pair(player2, player1);
 
         while(true){
-            std::cout << "Tura " << player1->name << std::endl;
-            std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
-            std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
+            turn(first, second);
 
-
-            player1->choose_move(*player2, current_distance);
-
-            if(player2->is_dead()){
-                std::cout << "Wygral gracz: " << player1->name << std::endl;
+            if(second->is_dead()){
+                std::cout << "Wygral gracz: " << first->name << std::endl;
                 break;
             }
 
-            std::cout << "Tura " << player2->name << std::endl;
-            std::cout << "Obecny dystans wynosi: " << current_distance << std::endl;
-            player2->choose_move(*player1, current_distance);
+            turn(second, first);
 
-
-            if(player1->is_dead()){
-                std::cout << "Wygral gracz: " << player2->name << std::endl;
+            if(first->is_dead()){
+                std::cout << "Wygral gracz: " << second->name << std::endl;
                 break;
             }
         }
@@ -554,35 +571,35 @@ public:
     }
 };
 
-template <Numeric T>
+template <SubAddMult T>
 inline void Wombat<T>::reduce_distance() {
     battlefield.reduce_distance(dex);
 }
 
-template <Numeric T>
+template <SubAddMult T>
 inline void Wombat<T>::increase_distance() {
     battlefield.increase_distance(dex);
 }
 
 
-template <Numeric T>
+template <SubAddMult T>
 inline void WomKnight<T>::reduce_distance() {
     this->battlefield.reduce_distance(this->dex * 2);
 }
 
-template <Numeric T>
+template <SubAddMult T>
 inline void WoArcher<T>::increase_distance() {
     this->battlefield.increase_distance(this->dex * 2);
 }
 
 
-template <Numeric T>
+template <SubAdd T>
 inline void HunterArmor<T>::effect(Wombat<T> &wombat) {
     wombat.dex += 5;
     wombat.current_stamina = std::min(wombat.stamina, wombat.stamina + 5);
 }
 
-template <Numeric T>
+template <SubAdd T>
 inline void ThiefArmor<T>::effect(Wombat<T> &wombat) {
     wombat.dex += 15;
     wombat.health = std::max(wombat.health - 10, 1);
@@ -590,14 +607,14 @@ inline void ThiefArmor<T>::effect(Wombat<T> &wombat) {
 }
 
 
-template <Numeric T>
+template <SubAdd T>
 inline void HavelArmor<T>::effect(Wombat<T> &wombat) {
     wombat.dex = std::max(0, wombat.dex - 5);
     wombat.strength += 4;
     wombat.stamina = std::max(0, wombat.stamina - 5);
 }
 
-template <Numeric T>
+template <SubAdd T>
 inline void EliteKnightArmor<T>::effect(Wombat<T> &wombat) {
     wombat.dex = std::max(0, wombat.dex - 4);
     wombat.health += 15;
