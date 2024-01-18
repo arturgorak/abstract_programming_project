@@ -14,7 +14,7 @@ public:
     WomKnight(std::string n, ColdWeapon<T>* w, HeavyArmor<T>* a, Battlefield<T>& b) : Wombat<T>(n, 50, 10, 5, 5, 4, 2, w, a, b) {}
 
     void passive() override{
-        this->reduce_distance();
+        this->health += 2;
     }
 
 
@@ -31,6 +31,10 @@ public:
 
     void increase_distance() override {
         this->battlefield.increase_distance(this->dex * 2);
+    }
+
+    void passive() override{
+        this->current_stamina = std::min(this->stamina, this->current_stamina + 2);
     }
 
 };
