@@ -71,7 +71,7 @@ public:
     void effect(Wombat<T> &wombat) {
         wombat.dex = std::max(0, wombat.dex - 5);
         wombat.strength += 4;
-        wombat.stamina = std::max(0, wombat.stamina - 5);
+        wombat.current_stamina = std::max(0, wombat.stamina - 5);
     }
 
 };
@@ -83,7 +83,7 @@ public:
     void effect(Wombat<T> &wombat) {
         wombat.dex = std::max(0, wombat.dex - 4);
         wombat.health += 15;
-        wombat.stamina = std::max(0, wombat.stamina - 5);
+        wombat.current_stamina = std::max(0, wombat.stamina - 5);
     }
 
 };

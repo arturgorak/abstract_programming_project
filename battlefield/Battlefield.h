@@ -155,6 +155,9 @@ public:
             }
         }
 
+        delete player1;
+        delete player2;
+
 
     }
 };

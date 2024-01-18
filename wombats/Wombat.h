@@ -65,7 +65,6 @@ public:
     }
 
     void wait(){
-        stats();
         current_stamina = std::min(stamina, current_stamina + stamina_restore);
         current_mana = std::min(mana, current_mana + mana_restore);
     }
